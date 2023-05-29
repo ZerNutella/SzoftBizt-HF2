@@ -99,6 +99,7 @@ bool readCIFFHeader(const std::string &filename, CIFFHeader &header)
 bool readPixelData(const std::string &filename, const CIFFHeader &header, std::vector<unsigned char> &pixels)
 {
     std::ifstream file(filename, std::ios::binary);
+    //If the file cannot be opened we return false
     if (!file)
     {
         return false;
@@ -188,6 +189,7 @@ bool readPixelData(std::ifstream &file, const CIFFHeader &header, std::vector<un
 bool readCAFF(const std::string &filename)
 {
     std::ifstream file(filename, std::ios::binary);
+    //If the file cannot be opened we return false
     if (!file)
     {
         return false;
@@ -217,6 +219,9 @@ bool readCAFF(const std::string &filename)
                 return false;
             //Process the header block data
             file.read(reinterpret_cast<char *>(&header.headerSize), sizeof(header.headerSize));
+            //If the size of the block doesnt match the given length of the block then return false
+            if(CaffBlock.length != header.headerSize)
+                return false;
             file.read(reinterpret_cast<char *>(&header.CIFFnum), sizeof(header.CIFFnum));
             hasHeader = true;
             break;
@@ -224,6 +229,7 @@ bool readCAFF(const std::string &filename)
         //The CreditsBlock
         case 0x2:
         {
+            //Can there be more than one CreditsBlock? Isnt specified, more than one creator maybe??
             //Read CreditsBlock
             CAFFCredit credits;
             //Read the year, month, day, hour and minute of the creation of the CAFF
@@ -234,6 +240,9 @@ bool readCAFF(const std::string &filename)
             file.read(reinterpret_cast<char *>(&credits.minute), sizeof(credits.minute));
             //Read the length of the creator's name
             file.read(reinterpret_cast<char *>(&credits.lengthCreator), sizeof(credits.lengthCreator));
+            //If the length of the block doesnt match the given length then return false
+            if(CaffBlock.length != sizeof(credits.year) + sizeof(credits.month) * 4 + credits.lengthCreator)
+                return false;
             //Read the creator's name
             credits.creator = new char[credits.lengthCreator + 1];
             file.read(credits.creator, credits.lengthCreator);
@@ -247,13 +256,16 @@ bool readCAFF(const std::string &filename)
         //The AnimationBlock
         case 0x3:
         {
-
+            //There is more than likely more than 1 frame in the CAFF
             //Read AnimationBlock
             CAFFAnimation animation;
             //Read the duration of the animation from the file
             file.read(reinterpret_cast<char *>(&animation.duration), sizeof(animation.duration));
             //Try to read the header from the CIFF part of the CAFF
             if (!readCIFFHeader(file, animation.header))
+                return false;
+            //If the size of the block doesnt match the given size of the block then return false
+            if(CaffBlock.length != sizeof(animation.duration) + animation.header.headerSize + animation.header.contentSize)
                 return false;
             //Try to read the pixel data from the CIFF part of the CAFF
             if (!readPixelData(file, animation.header, animation.pixels))
